@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 
 class EmotionDataset(Dataset):
 
-    def __init__(self, csv_path="data/metadata.csv", data_root="data/raw",
+    def __init__(self, csv_path="data/flora_voice_dataset/metadata.csv", data_root="data/flora_voice_dataset/",
                  split="train", sample_rate=16000, duration=3.0,
                  val_ratio=0.1, random_state=42):
 

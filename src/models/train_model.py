@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from src.data.make_data import EmotionDataset
+from src.data.make_dataset import EmotionDataset
 from src.models.sincnet.model import SincNet
 
 
