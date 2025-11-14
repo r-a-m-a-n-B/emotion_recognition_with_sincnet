@@ -53,7 +53,7 @@ def predict_emotion(audio_path,
         pred = torch.argmax(logits, dim=1).item()
 
     emotion = inv_label_map[pred]
-    print(f"🎵 Predicted Emotion: {emotion}")
+    print(f"Predicted Emotion: {emotion}")
     return emotion
 
 

@@ -60,6 +60,16 @@ class EmotionDataset(Dataset):
         path = f"{self.data_root}/{row['file_name']}"
         emotion = row["emotion"]
 
+        import glob, os
+        if not os.path.exists(path):
+            search_pattern = os.path.join(self.data_root, "**", os.path.basename(path))
+            matches = glob.glob(search_pattern, recursive=True)
+        if len(matches) > 0:
+            path = matches[0]
+            # print(f"[INFO] Found '{os.path.basename(path)}' in {os.path.dirname(path)}")
+        else:
+            raise FileNotFoundError(f"Audio file not found: {path}")
+
         # Load audio ---
         waveform, sr = librosa.load(path, sr=self.sample_rate, mono=True)
 
@@ -73,3 +83,13 @@ class EmotionDataset(Dataset):
         label = self.label_map[emotion]
 
         return waveform, label
+
+
+
+
+
+
+
+
+
+

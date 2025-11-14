@@ -83,19 +83,27 @@ class SincNetFilterConvLayer(nn.Module):
 
         band_pass = torch.cat([band_pass_left,band_pass_center,band_pass_right],dim=1)
         band_pass = band_pass / (2*band[:,None])
+        
+        #  # ✅ Fix shape mismatch if computed filters are half of expected count
+        # expected = self._out_channels * self._kernel_size
+        # if band_pass.numel() != expected:
+        #     print(f"[⚙️ Fix] Adjusting band_pass shape: expected {expected}, got {band_pass.numel()}")
+        #     band_pass = torch.cat([band_pass, band_pass], dim=0)[:self._out_channels]
+
         return band_pass.view(self._out_channels, 1, self._kernel_size)
 
     def forward(self, waveforms: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            waveforms : (batch_size, 1, n_samples) batch of waveforms.
-        
-        Returns:
-            features : (batch_size, out_channels, n_samples_out) batch of sinc filters activations.
-        """
-        return F.conv1d(waveforms, self.filters, stride=self._stride,
-                        padding=self._padding, dilation=self._dilation,
-        ).abs_() # https://github.com/mravanelli/SincNet/issues/4
+
+        # Ensure filters are on the same device as waveforms
+        filters = self.filters.to(waveforms.device)
+
+        return F.conv1d(
+            waveforms, filters,
+            stride=self._stride,
+            padding=self._padding,
+            dilation=self._dilation,
+        ).abs_()
+
 
 class SincNet(nn.Module):
     """SincNet"""
@@ -164,3 +172,4 @@ class SincNet(nn.Module):
             outputs = F.leaky_relu(norm1d(pool1d(outputs)))
 
         return outputs
+
