@@ -46,7 +46,7 @@ class SincNetFilterConvLayer(nn.Module):
         mel = np.linspace(
             2595 * np.log10(1 + low_hz / 700), # Convert Hz to Mel
             2595 * np.log10(1 + high_hz / 700), # Convert Hz to Mel
-            self._out_channels // 2 + 1
+            self._out_channels  + 1
         )
         hz = 700 * (10 ** (mel / 2595) - 1) # Convert Mel to Hz
         
@@ -84,11 +84,6 @@ class SincNetFilterConvLayer(nn.Module):
         band_pass = torch.cat([band_pass_left,band_pass_center,band_pass_right],dim=1)
         band_pass = band_pass / (2*band[:,None])
         
-        #  # ✅ Fix shape mismatch if computed filters are half of expected count
-        # expected = self._out_channels * self._kernel_size
-        # if band_pass.numel() != expected:
-        #     print(f"[⚙️ Fix] Adjusting band_pass shape: expected {expected}, got {band_pass.numel()}")
-        #     band_pass = torch.cat([band_pass, band_pass], dim=0)[:self._out_channels]
 
         return band_pass.view(self._out_channels, 1, self._kernel_size)
 
