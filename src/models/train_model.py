@@ -23,7 +23,7 @@ class SincNetEmotion(nn.Module):
         with torch.no_grad():
             dummy = torch.randn(1, 1, 16000*3)  # 3 sec sample
             feat = self.sincnet(dummy)
-            flattened_dim = feat.view(feat.size(0), -1).shape[1]
+            flattened_dim = feat.shape[1]
             print(f"[INFO] SincNet output features per sample: {flattened_dim}")
 
         # --- DNN classifier (as per Ravanelli)
@@ -48,24 +48,26 @@ class SincNetEmotion(nn.Module):
 
     def forward(self, x):
         x = self.sincnet(x)
-        x = x.view(x.size(0), -1)  # flatten
+        x = torch.mean(x, dim=2)
+        #x = x.view(x.size(0), -1)  # flatten
         return self.dnn(x)
 
 
 def train_emotion_model(csv_path="/content/emotion_recognition_with_sincnet/src/data/flora_voice_dataset/metadata.csv",
                         data_root="/content/emotion_recognition_with_sincnet/src/data/flora_voice_dataset",
-                        epochs=50,
+                        epochs=100,
                         batch_size=32,
                         lr=1e-3,
-                        N_eval_epoch=5):
+                        N_eval_epoch=5,
+                        origin=None):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Training on {device}")
 
     # Load datasets
-    train_ds = EmotionDataset(csv_path, data_root, split="train")
-    val_ds = EmotionDataset(csv_path, data_root, split="val")
-    test_ds = EmotionDataset(csv_path, data_root, split="test")
+    train_ds = EmotionDataset(csv_path, data_root, split="train", origin=origin)
+    val_ds = EmotionDataset(csv_path, data_root, split="val", origin=origin)
+    test_ds = EmotionDataset(csv_path, data_root, split="test", origin=origin)
 
     print(f"Number of training samples:   {len(train_ds)}")
     print(f"Number of validation samples: {len(val_ds)}")
@@ -73,11 +75,14 @@ def train_emotion_model(csv_path="/content/emotion_recognition_with_sincnet/src/
 
     num_classes = len(train_ds.emotions)
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
-    val_dl = DataLoader(val_ds, batch_size=batch_size)
-    test_dl = DataLoader(test_ds, batch_size=batch_size)
+    val_dl = DataLoader(val_ds, batch_size=batch_size,shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size,shuffle=False)
 
     model = SincNetEmotion(num_classes=num_classes).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode='min', factor=0.5, patience=3
+)
     criterion = nn.CrossEntropyLoss()
 
     # Results log file
@@ -95,6 +100,7 @@ def train_emotion_model(csv_path="/content/emotion_recognition_with_sincnet/src/
             logits = model(wave)
             loss = criterion(logits, label)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             optimizer.step()
 
             total_loss += loss.item()
@@ -116,15 +122,17 @@ def train_emotion_model(csv_path="/content/emotion_recognition_with_sincnet/src/
                 preds = torch.argmax(logits, dim=1)
                 val_correct += (preds == label).sum().item()
                 val_total += label.size(0)
+        
+        val_loss = val_loss_sum / max(1,len(val_dl))
+        scheduler.step(val_loss)
 
         val_acc = 100 * val_correct / val_total
-        val_loss = val_loss_sum / len(val_dl)
-
         print(f"Epoch {epoch}/{epochs} | Train Loss: {train_loss:.4f} | "
               f"Train Acc: {train_acc:.2f}% | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%")
         
         # Full test every few epochs (like mravanelli/SincNet)
         if epoch % N_eval_epoch == 0:
+            model.eval()
             test_correct, test_total, test_loss_sum = 0, 0, 0
             with torch.no_grad():
                 for wave, label in test_dl:
