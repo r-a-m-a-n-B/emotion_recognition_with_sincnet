@@ -1,6 +1,7 @@
 import torch
 import librosa
 import pandas as pd
+import os
 import numpy as np
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
@@ -35,6 +36,8 @@ class EmotionDataset(Dataset):
                  split="train", sample_rate=16000, duration=3.0,
                  val_ratio=0.1, random_state=42,origin=None):
 
+        
+
         self.data = pd.read_csv(csv_path)
         self.data_root = data_root
         self.sample_rate = sample_rate
@@ -46,10 +49,18 @@ class EmotionDataset(Dataset):
         self.pitch_shift_range = (-0.5, 0.5)      
         self.time_stretch_range = (0.9, 1.1 )  
 
+        self.file_index = {}
+        for root, _, files in os.walk(self.data_root):
+            for f in files:
+                self.file_index[f] = os.path.join(root, f)
         
         # --- Split the data ---
-        training_data = self.data[self.data["split"] == "train"].reset_index(drop=True)
-        testing_data = self.data[self.data["split"] == "test"].reset_index(drop=True)
+        if origin is not None:
+            training_data = self.data[self.data["origin"] != origin].reset_index(drop=True)
+            testing_data = self.data[self.data["origin"] == origin].reset_index(drop=True)
+        else:
+            training_data = self.data[self.data["split"] == "train"].reset_index(drop=True)
+            testing_data = self.data[self.data["split"] == "test"].reset_index(drop=True)
 
         # Create validation split 
         if "val" not in self.data["split"].unique():
@@ -90,18 +101,17 @@ class EmotionDataset(Dataset):
         path = f"{self.data_root}/{row['file_name']}"
         emotion = row["emotion"]
 
-        import glob, os
-        if not os.path.exists(path):
-            search_pattern = os.path.join(self.data_root, "**", os.path.basename(path))
-            matches = glob.glob(search_pattern, recursive=True)
-        if len(matches) > 0:
-            path = matches[0]
-        else:
-            raise FileNotFoundError(f"Audio file not found: {path}")
+        fname = row["file_name"]
+        try:
+            path = self.file_index[fname]
+        except KeyError:
+            raise FileNotFoundError(f"Audio file not found: {fname}")
+
 
         # Load audio ---
-        waveform, sr = librosa.load(path, sr=self.sample_rate, mono=True)
-
+        waveform, sr = librosa.load(path, sr=None, mono=True)
+        if sr != self.sample_rate:
+            waveform = librosa.resample(waveform, orig_sr=sr, target_sr=self.sample_rate)
 
         # Applying augmentation
         if self.apply_augment:
@@ -135,13 +145,3 @@ class EmotionDataset(Dataset):
         label = self.label_map[emotion]
 
         return waveform, label
-
-
-
-
-
-
-
-
-
-
