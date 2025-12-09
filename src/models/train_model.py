@@ -148,8 +148,7 @@ def train_emotion_model(csv_path="/content/emotion_recognition_with_sincnet/src/
               f"Train Acc: {train_acc:.2f}% | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%")
         with open(res_path, "a") as f:
                 f.write(f"Epoch {epoch:03d} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-                        f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}% | "
-                        f"Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%\n")
+                        f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%\n")
         
         # Full test every few epochs (like mravanelli/SincNet)
         if epoch % N_eval_epoch == 0:
